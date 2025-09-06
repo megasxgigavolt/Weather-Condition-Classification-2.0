@@ -1,9 +1,9 @@
 version: 1.0
 runtime: python3
 build:
-  commands:
-    - python -m ensurepip --upgrade || true
-    - python -m pip install --upgrade pip
-    - python -m pip install --no-cache-dir -r requirements.txt
+  commands: |
+    python -m ensurepip --upgrade || true
+    python -m pip install --upgrade pip
+    python -m pip install --no-cache-dir -r requirements.txt
 run:
   command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
