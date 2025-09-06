@@ -1,9 +1,9 @@
 version: 1.0
-runtime: python3
-build:
-  commands: |
-    python -m ensurepip --upgrade || true
-    python -m pip install --upgrade pip
-    python -m pip install --no-cache-dir -r requirements.txt
+runtime: python311
 run:
+  runtime-version: 3.11
+  pre-run:
+    - python3 -m ensurepip --upgrade || true
+    - python3 -m pip install --upgrade pip
+    - python3 -m pip install --no-cache-dir -r requirements.txt
   command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
