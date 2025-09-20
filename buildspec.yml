@@ -22,16 +22,8 @@ phases:
       - echo "==> Pushing the Docker image..."
       - docker push $REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
       - echo "==> Writing Dockerrun.aws.json file..."
-      - printf '{
-          "AWSEBDockerrunVersion": "1",
-          "Image": {
-            "Name": "%s.dkr.ecr.%s.amazonaws.com/%s:%s",
-            "Update": "true"
-          },
-          "Ports": [
-            { "ContainerPort": "8080" }
-          ]
-        }' $ACCOUNT_ID $AWS_DEFAULT_REGION $IMAGE_REPO_NAME $CODEBUILD_RESOLVED_SOURCE_VERSION > Dockerrun.aws.json
+      - printf '{"AWSEBDockerrunVersion":"1","Image":{"Name":"%s.dkr.ecr.%s.amazonaws.com/%s:%s","Update":"true"},"Ports":[{"ContainerPort":"8080"}]}' \
+        $ACCOUNT_ID $AWS_DEFAULT_REGION $IMAGE_REPO_NAME $CODEBUILD_RESOLVED_SOURCE_VERSION > Dockerrun.aws.json
 
 artifacts:
   files:
