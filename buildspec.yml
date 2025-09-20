@@ -7,36 +7,28 @@ env:
 phases:
   pre_build:
     commands:
-      - echo "==> Resolving AWS account and ECR repo"
+      - echo "==> Resolve account and repo"
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REPO_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}
-      - if ! aws ecr describe-repositories --repository-names "${IMAGE_REPO_NAME}" >/dev/null 2>&1; then aws ecr create-repository --repository-name "${IMAGE_REPO_NAME}"; fi
-      - echo "==> Logging in to ECR: ${REPO_URI}"
+      - aws ecr describe-repositories --repository-names "${IMAGE_REPO_NAME}" >/dev/null 2>&1 || aws ecr create-repository --repository-name "${IMAGE_REPO_NAME}"
+      - echo "==> Login to ECR ${REPO_URI}"
       - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
 
   build:
     commands:
-      - echo "==> Building docker image"
+      - echo "==> Build image"
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION}
       - docker build --pull -t "${REPO_URI}:${IMAGE_TAG}" .
       - docker tag "${REPO_URI}:${IMAGE_TAG}" "${REPO_URI}:latest"
 
   post_build:
     commands:
-      - echo "==> Pushing docker image"
+      - echo "==> Push image"
       - docker push "${REPO_URI}:${IMAGE_TAG}"
       - docker push "${REPO_URI}:latest"
-      - echo "==> Writing Dockerrun.aws.json for Elastic Beanstalk"
-      - printf '{
-          "AWSEBDockerrunVersion": "1",
-          "Image": {
-            "Name": "%s.dkr.ecr.%s.amazonaws.com/%s:latest",
-            "Update": "true"
-          },
-          "Ports": [
-            { "ContainerPort": "8080" }
-          ]
-        }' "${ACCOUNT_ID}" "${AWS_DEFAULT_REGION}" "${IMAGE_REPO_NAME}" > Dockerrun.aws.json
+      - echo "==> Write Dockerrun.aws.json"
+      - printf '{"AWSEBDockerrunVersion":"1","Image":{"Name":"%s.dkr.ecr.%s.amazonaws.com/%s:latest","Update":"true"},"Ports":[{"ContainerPort":"8080"}]}' "${ACCOUNT_ID}" "${AWS_DEFAULT_REGION}" "${IMAGE_REPO_NAME}" > Dockerrun.aws.json
+      - cat Dockerrun.aws.json
 
 artifacts:
   files:
