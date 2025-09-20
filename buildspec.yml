@@ -1,34 +1,37 @@
 version: 0.2
 
-env:
-  variables:
-    IMAGE_REPO_NAME: "streamlit-weather"
-
 phases:
   pre_build:
     commands:
       - echo "==> Resolve account and repo"
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REPO_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}
-      - aws ecr describe-repositories --repository-names "${IMAGE_REPO_NAME}" >/dev/null 2>&1 || aws ecr create-repository --repository-name "${IMAGE_REPO_NAME}"
-      - echo "==> Login to ECR ${REPO_URI}"
-      - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      - echo "==> Logging in to ECR"
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
   build:
     commands:
-      - echo "==> Build image"
-      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION}
-      - docker build --pull -t "${REPO_URI}:${IMAGE_TAG}" .
-      - docker tag "${REPO_URI}:${IMAGE_TAG}" "${REPO_URI}:latest"
+      - echo "==> Build started on $(date)"
+      - echo "==> Building the Docker image..."
+      - docker build -t $IMAGE_REPO_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+      - docker tag $IMAGE_REPO_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION $REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
 
   post_build:
     commands:
-      - echo "==> Push image"
-      - docker push "${REPO_URI}:${IMAGE_TAG}"
-      - docker push "${REPO_URI}:latest"
-      - echo "==> Write Dockerrun.aws.json"
-      - printf '{"AWSEBDockerrunVersion":"1","Image":{"Name":"%s.dkr.ecr.%s.amazonaws.com/%s:latest","Update":"true"},"Ports":[{"ContainerPort":"8080"}]}' "${ACCOUNT_ID}" "${AWS_DEFAULT_REGION}" "${IMAGE_REPO_NAME}" > Dockerrun.aws.json
-      - cat Dockerrun.aws.json
+      - echo "==> Build completed on $(date)"
+      - echo "==> Pushing the Docker image..."
+      - docker push $REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - echo "==> Writing Dockerrun.aws.json file..."
+      - printf '{
+          "AWSEBDockerrunVersion": "1",
+          "Image": {
+            "Name": "%s.dkr.ecr.%s.amazonaws.com/%s:%s",
+            "Update": "true"
+          },
+          "Ports": [
+            { "ContainerPort": "8080" }
+          ]
+        }' $ACCOUNT_ID $AWS_DEFAULT_REGION $IMAGE_REPO_NAME $CODEBUILD_RESOLVED_SOURCE_VERSION > Dockerrun.aws.json
 
 artifacts:
   files:
