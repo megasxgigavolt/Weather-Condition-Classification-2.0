@@ -3,8 +3,8 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - |-
-        set -euo pipefail
+      - |
+        set -eu
         echo "==> Resolve account and repo"
         ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
         REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
@@ -15,33 +15,27 @@ phases:
 
   build:
     commands:
-      - |-
-        set -euo pipefail
+      - |
+        set -eu
         echo "==> Build started on $(date)"
-        echo "==> Building image…"
         docker build -t "${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}" .
         docker tag "${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}" \
           "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
-        echo "==> Built and tagged: ${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 
   post_build:
     commands:
-      - |-
-        set -euo pipefail
-        echo "==> Build completed on $(date)"
+      - |
+        set -eu
         echo "==> Pushing image…"
         docker push "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
         echo "==> Writing Dockerrun.aws.json…"
-        cat > Dockerrun.aws.json <<'JSON'
+        cat > Dockerrun.aws.json <<JSON
         {
           "AWSEBDockerrunVersion": "1",
-          "Image": { "Name": "__REPO_URI__:__TAG__", "Update": "true" },
+          "Image": { "Name": "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}", "Update": "true" },
           "Ports": [ { "ContainerPort": "8080" } ]
         }
         JSON
-        sed -i "s#__REPO_URI__#${REPO_URI}#g" Dockerrun.aws.json
-        sed -i "s#__TAG__#${CODEBUILD_RESOLVED_SOURCE_VERSION}#g" Dockerrun.aws.json
-        echo "==> Dockerrun content:" && cat Dockerrun.aws.json
 
 artifacts:
   files:
