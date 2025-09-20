@@ -1,12 +1,21 @@
-pip>=24.0
-setuptools>=69.0
-wheel>=0.43
-streamlit==1.36.0
+# Core web + UI
+streamlit==1.33.0
 pandas==2.2.2
 numpy==1.26.4
 matplotlib==3.8.4
-boto3==1.34.131
+
+# ML / training
+scikit-learn==1.5.1
+scipy==1.13.1
+xgboost==2.1.1
 joblib==1.4.2
-xgboost==2.0.3
-scikit-learn==1.4.2
-protobuf==4.25.3
+
+# AWS SDK
+boto3==1.34.131
+
+# Config & API
+python-dotenv==1.0.1
+openai==1.37.0
+
+# Timezone / date utils
+tzdata==2025.2
