@@ -13,10 +13,13 @@ joblib==1.4.2
 # AWS SDK
 boto3==1.34.131
 
-# Config & API (pin modern OpenAI + its HTTP client)
+# Config & API
 python-dotenv==1.0.1
 openai==1.40.2
-httpx>=0.27,<1
+
+# Explicit httpx + httpcore pin to avoid "proxies" error
+httpx==0.26.0
+httpcore==0.17.3
 
 # Timezone / date utils
 tzdata==2025.2
