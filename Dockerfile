@@ -1,19 +1,25 @@
-# Python 3.11 with slim base
+# Dockerfile
 FROM python:3.11-slim
 
-# System libs (libgomp is needed by xgboost wheel)
-RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+# System deps (for scientific libs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc g++ curl \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy deps first to leverage layer caching
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# EB’s nginx will map to this container port
-ENV PORT=8080
+# Copy app
+COPY app.py /app/app.py
+
+# Streamlit defaults
+ENV STREAMLIT_SERVER_PORT=8080
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+# Disable usage stats (optional)
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
 EXPOSE 8080
-
-# Streamlit must listen on 0.0.0.0
-CMD ["streamlit", "run", "app.py", "--server.port=8080", "--server.address=0.0.0.0"]
+CMD ["bash", "-lc", "streamlit run /app/app.py --server.address=${STREAMLIT_SERVER_ADDRESS} --server.port=${STREAMLIT_SERVER_PORT}"]
