@@ -3,29 +3,45 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "==> Resolve account and repo"
-      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - export REPO_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}
-      - echo "==> Using REPO_URI: $REPO_URI"
-      - echo "==> Login to ECR"
-      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      - |-
+        set -euo pipefail
+        echo "==> Resolve account and repo"
+        ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+        REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
+        echo "==> Using REPO_URI: ${REPO_URI}"
+        echo "==> Login to ECR"
+        aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" \
+          | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
 
   build:
     commands:
-      - echo "==> Build started on $(date)"
-      - echo "==> Building image…"
-      - docker build -t "${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}" .
-      - docker tag "${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}" "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
-      - echo "==> Built and tagged: ${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+      - |-
+        set -euo pipefail
+        echo "==> Build started on $(date)"
+        echo "==> Building image…"
+        docker build -t "${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}" .
+        docker tag "${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}" \
+          "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+        echo "==> Built and tagged: ${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 
   post_build:
     commands:
-      - echo "==> Build completed on $(date)"
-      - echo "==> Pushing image…"
-      - docker push "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
-      - echo "==> Writing Dockerrun.aws.json…"
-      - printf '{"AWSEBDockerrunVersion":"1","Image":{"Name":"%s","Update":"true"},"Ports":[{"ContainerPort":"8080"}]}' "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}" > Dockerrun.aws.json
-      - echo "==> Dockerrun content:" && cat Dockerrun.aws.json
+      - |-
+        set -euo pipefail
+        echo "==> Build completed on $(date)"
+        echo "==> Pushing image…"
+        docker push "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+        echo "==> Writing Dockerrun.aws.json…"
+        cat > Dockerrun.aws.json <<'JSON'
+        {
+          "AWSEBDockerrunVersion": "1",
+          "Image": { "Name": "__REPO_URI__:__TAG__", "Update": "true" },
+          "Ports": [ { "ContainerPort": "8080" } ]
+        }
+        JSON
+        sed -i "s#__REPO_URI__#${REPO_URI}#g" Dockerrun.aws.json
+        sed -i "s#__TAG__#${CODEBUILD_RESOLVED_SOURCE_VERSION}#g" Dockerrun.aws.json
+        echo "==> Dockerrun content:" && cat Dockerrun.aws.json
 
 artifacts:
   files:
