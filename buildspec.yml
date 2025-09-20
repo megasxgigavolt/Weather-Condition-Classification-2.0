@@ -1,23 +1,51 @@
 version: 0.2
+
 env:
   variables:
-    IMAGE_TAG: latest
+    AWS_DEFAULT_REGION: "eu-north-1"
+    IMAGE_REPO_NAME: "streamlit-weather"   # your ECR repo name
+    # IMAGE_TAG is set in pre_build; you can also predefine it as "latest" if you prefer
+
 phases:
   pre_build:
     commands:
-      - aws --version
+      - echo "Logging into ECR..."
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - REPO=streamlit-weather
-      - REPO_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${REPO}
-      - aws ecr get-login-password | docker login --username AWS --password-stdin ${REPO_URI}
+      - REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
+      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+      - IMAGE_TAG=$(echo ${CODEBUILD_RESOLVED_SOURCE_VERSION} | cut -c1-7)
+      - echo "REPO_URI=${REPO_URI}"
+      - echo "IMAGE_TAG=${IMAGE_TAG}"
+
   build:
     commands:
+      - echo "Building ${REPO_URI}:${IMAGE_TAG} ..."
       - docker build -t ${REPO_URI}:${IMAGE_TAG} .
+
   post_build:
     commands:
+      - echo "Pushing image..."
       - docker push ${REPO_URI}:${IMAGE_TAG}
-      # Emit Dockerrun for EB
-      - printf '{"AWSEBDockerrunVersion":"1","Image":{"Name":"%s","Update":"true"},"Ports":[{"ContainerPort":"8080"}]}\n' ${REPO_URI}:${IMAGE_TAG} > Dockerrun.aws.json
+      - echo "Writing Dockerrun.aws.json for EB..."
+      - |
+        cat > Dockerrun.aws.json <<EOF
+        {
+          "AWSEBDockerrunVersion": "1",
+          "Image": {
+            "Name": "${REPO_URI}:${IMAGE_TAG}",
+            "Update": "true"
+          },
+          "Ports": [
+            {
+              "ContainerPort": "8080",
+              "HostPort": "8080"
+            }
+          ]
+        }
+        EOF
+      - echo "Dockerrun.aws.json created:"
+      - cat Dockerrun.aws.json
+
 artifacts:
   files:
     - Dockerrun.aws.json
